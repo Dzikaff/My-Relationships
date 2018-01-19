@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html><head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+		<title>Weatherman</title>
+		<style>
+
+			html,body{
+				height:100%;
+				margin:0px;
+				font-family:tahoma;
+				font-size:13px; }
+
+			p{
+				margin-left: 21px;
+			}
+
+			#wrapper{
+				min-height:100%;
+				margin-bottom: -50px;}
+
+			.footer,.push {height: 50px;}
+
+			#content{
+				padding-top: 10px;
+				top:-8px;
+				height: 100%;}
+
+			#header{
+				padding: 6px 0px 0px 7px;
+				border-bottom: 1px solid black;}
+
+			.tab{
+				position:relative;
+				background-color:white;
+				display:inline;
+				border: 1px solid black;
+				border-bottom: 0px none;
+				margin: 0px 3px 0px 3px;
+				padding: 0px 3px 0px 3px;}
+
+			#graphContainer{
+				width:100%;
+				min-height:500px;}
+
+			#typeContainer{
+				width:610px;
+				height:610px; }
+
+			table {
+				border-spacing: 0px;
+				text-align:left;
+				border-right: 1px solid #888;
+				border-bottom: 1px solid #888;}
+
+			td {
+				padding-left: 2px
+				padding-right: 2px;
+				border-top: 1px solid #888;
+				border-left: 1px solid #888;
+
+		</style>
+		<script src="MR_files/jquery-2.js"></script>
+		<script src="MR_files/underscore-min.js"></script>
+		<script>
+
+//
+// Programming by Tuukka Virtaperko
+//
+
+/*
+
+Theodict
+
+God is
+undefinable
+male
+many
+one
+
+Pictures are
+Good is
+etc
+
+I would describe something in
+pictures---words
+
+*/
+
+/*
+
+If you don't understand metaphors you aren't wise enough to benefit of this program
+
+I am warm and soft
+I am cold and hard
+I am hard and brittle
+I am sweet and strong
+
+*/
+
+/*
+
+Pelisuunnitelma chat room
+<perwo pappi!>
+
+*/
+
+var s = {
+	developerMode: false,
+	introComplete: false,
+	initTab: "intro",
+	theories: ["MBTI","moralysis","socionics"],
+	currentTheory: "socionics",
+	languages: [], 
+	currentLanguage: "MBTi",
+	tabs: ["intro","quiz","type","rels","cell","graph","match"],
+	currentTab: "",
+	initTabs: [],
+	sociotypeNames: "MBTi",
+	questions: [],
+	quizResult: false,
+	persons: [], // I know proper is "people" but this is more convenient due to +-s
+	sociotypes: [],
+	MBTITypes: [],
+	rels: [], //unnecessary?
+	currentDescriptions: "socionics.com",
+	defaultRadius: 75,
+	cellRadiusX: 10,
+	cellRadiusY: 10}
+
+//
+// QUIZ BEGIN
+//
+
+function displayResult(sociotype){
+	s.quizResult = sociotype;
+	var result = document.getElementById("result");
+	result.innerHTML = "<h2>Your MBTI type: " + generateSociotypeName(sociotype) + "</h2>" +
+		"<h2>Your Sociotype: " + generateSociotypeName(sociotype) + "</h2>" +
+		"These types have the same letters, but they mean different things. Let's see what they mean.<br />\
+		<button id='quizNext' onmousedown='quizNext();'>Next</button>"; }
+
+function clearSociotype(sociotype){sociotype.ie=0; sociotype.sn=0; sociotype.ft=0; sociotype.jp=0; return sociotype;}
+function copySociotype(sociotype){var ret = new Sociotype(sociotype.ie, sociotype.sn, sociotype.ft, sociotype.jp); return ret;}
+function sumSociotype(sociotype1,sociotype2){sociotype1.ie += sociotype2.ie;sociotype1.sn += sociotype2.sn; sociotype1.ft += sociotype2.ft; sociotype1.jp += sociotype2.jp; return sociotype1;}
+
+function interpretAnswers(){
+	var ret = new Sociotype(0,0,0,0);
+	var templateAnswer = new Sociotype(0,0,0,0);
+	for(var i=0; i < s.questions.length; i++) {
+		templateAnswer.ie = s.questions[i].meaning.ie * s.questions[i].answer;
+		templateAnswer.sn = s.questions[i].meaning.sn * s.questions[i].answer;
+		templateAnswer.ft = s.questions[i].meaning.ft * s.questions[i].answer;
+		templateAnswer.jp = s.questions[i].meaning.jp * s.questions[i].answer;
+		ret = sumSociotype(ret,templateAnswer);
+		templateAnswer = clearSociotype(templateAnswer);}
+	return ret;}
+
+function generateResult(){
+	var result = interpretAnswers();
+	displayResult(result);
+	if(s.persons.length == 0){
+		addPerson("You",result);
+		addPerson("Your MBTI dual",result);
+		addPerson("Your MBTI conflictor",result);
+		addPerson("Your Socionics conflictor",result);
+		addPerson("Your Socionics dual",result);}}
+
+function clearOtherInputs(id,answer){
+	var elementId; var input;
+	var chosenAnswer = "question" + id + "input" + answer;
+	for(var i = -2; i < 3; i++){	
+		elementId = "question" + id + "input" + i;
+		input = document.getElementById(elementId);
+		if(elementId != chosenAnswer) {input.checked = false;}}}
+
+function answerQuestion(id,answer){
+	s.questions[id].answer = answer;
+	clearOtherInputs(id, answer);}
+
+function isAnswered(input,value){
+	if(input == value) {return "checked"; }}
+
+function createAnswerField(id){
+	var checked; var ret = ""; 
+	for(var i = -2; i < 3; i++){
+		checked = "";
+		if(s.questions[id].answer) {checked = isAnswered(s.questions[id].answer,i);}
+		ret = ret + "<input id='question" + id + "input" + i + 
+			"' class='" + i +
+			"' " + checked +
+			" type='radio'\
+			onmousedown='answerQuestion(" + id + "," + i +
+			");'></input>";}
+	return ret;}
+
+function createMeaning(input){
+	var ret = new Sociotype(0,0,0,0);
+	if(input.ie) {ret.ie = input.ie;}
+	if(input.sn) {ret.sn = input.sn;}
+	if(input.ft) {ret.ft = input.ft;}
+	if(input.jp) {ret.jp = input.jp;}
+	return ret;}
+
+function Question(left,right,meaning,system,context){
+	this.left = left;
+	this.right = right;
+	this.meaning = createMeaning(meaning);
+	this.answer = false;
+	this.system = system;
+	this.context = context;}
+
+function createQuestion(left,right,meaning,system,context){
+	var properMeaning = new Sociotype(0,0,0,0);
+	if(meaning.ie) {properMeaning.ie += meaning.ie;}
+	if(meaning.sn) {properMeaning.sn += meaning.sn;}
+	if(meaning.ft) {properMeaning.ft += meaning.ft;}
+	if(meaning.jp) {properMeaning.jp += meaning.jp;}
+	var ret = new Question(left,right,properMeaning,system,context);
+	s.questions.push(ret);}
+
+// branching for theories, languages, etc. generalize over all these (make an object)
+
+// System object. it is possible to group theories as members of systems. Psychology is one system, metaphysics another
+
+// Add all systems option? Is this possible?
+
+// dichotomies could be used to argue for the case that questions need multiple meanings...
+
+/*
+pair is a logic gate except that the inputs and outputs are value instead of truth or falsehood
+jp value = negation
+(!intp) <=> intj === QID, (!intj) <=> intp === QID
+intp <=> intp === IDN
+intp && esfp === DLT
+!esfj && intp === CNF
+infp XOR intp === CMP
+!infj <= intp === BN
+!enfj => intp === SP
+NAND is SDL
+!estj NAND intp (<==?)
+
+1001 relationship produces value when other is absent
+
+how do SP and BN benefit? identify qualitative difference in what does the implication pertain to
+judging negation means superiority or precedence
+perceiving non-negation means superiority or precedence
+
+people who expect it to be meaningful to obey laws will be accused of autism until they change their expectations
+*/
+
+function initPsychQuestions(){
+	createQuestion("I'd run out of energy sooner in the company of others.","I'd run out of energy sooner in solitude.",{ie:1},"psychology","properties");
+	//createQuestion("I am firm. I stick to my choices or responsibilites, not just my principles.","I am impressionable. I spend time considering or exploring many options.",{sn:1});
+	createQuestion("Strong or weak, I am more firm than impressionable. I'm aware of my goals and responsibilities.","I'm usually more impressionable than firm. I spend time considering or exploring options.",{sn:1},"psychology","properties");
+	createQuestion("I am nice.","I am cold.",{ft:1},"psychology","properties");
+	createQuestion("My behaviour is based on my own values, according to which I judge circumstances.","My behaviour is based on the circumstances. I perceive and react.",{jp:1},"psychology","singularProperties");
+
+	createQuestion("I am warm and soft","I am cold and hard",{sn:-1,tf:-1},"psychology","dualityMetaphors");
+	createQuestion("I am hard and brittle","I am sweet and strong",{sn:-1,tf:1},"psychology","dualityMetaphors");
+}
+
+function displayQuestions(){
+	var table = document.getElementById("questions");
+	var row; var cell;
+	for(var i = 0; i < s.questions.length; i++){
+		row = table.insertRow(i);
+		cell = row.insertCell(0);
+		cell.innerHTML = s.questions[i].left;
+		cell.style.textAlign = "right";
+		cell = row.insertCell(1);
+		cell.innerHTML = createAnswerField(i);
+		cell = row.insertCell(2);
+		cell.innerHTML = s.questions[i].right;}}
+
+function displayQuiz(alreadyInit){
+	displayQuestions(alreadyInit);
+	if(s.quizResult) {generateResult();}}
+
+//
+// QUIZ END, TYPE BEGIN
+//
+
+function makeCircuitTable(t) {
+	console.log(t); //xxx
+	var rows = [];
+	rows.push(["Block",		"Accepting",	  "Producing"]);
+	rows.push(["Ego", 		t.ego.acc.handle,  t.ego.pro.handle]);
+	rows.push(["Super-Ego", t.sEgo.acc.handle, t.sEgo.pro.handle]);
+	rows.push(["Super-Id",  t.sId.acc.handle,  t.sId.pro.handle]);
+	rows.push(["Id",		t.id.acc.handle,   t.id.pro.handle]);
+	return rows; }
+
+function drawCircuitTable(rows) {
+	var table = document.getElementById("sociotype");
+	var row; var cell;
+	$( "#sociotype").empty();
+	for(var i = 0; i < rows.length; i++) {
+		row = table.insertRow(i);
+		for(var j = 0; j < rows[i].length; j++) {
+			cell = row.insertCell(j);
+			cell.innerHTML = rows[i][j]; }}}
+
+function displayType(alreadyInit) {
+	if(s.persons.length == 0) {	var buffer = new Sociotype(0,1,1,1); addPerson("INTP", buffer); }
+	drawCircuitTable(makeCircuitTable(s.persons[0].sociotype)); }
+
+function typeInTheory(type,theory){
+	var ret;
+	if(typeof type == "Sociotype") {
+		if(theory == "socionics") {
+			blockSociotype(type);}}
+	return ret;}
+
+//
+// TYPE END, RELS BEGIN
+//
+
+function numberToLetter(number){
+	var alphabet = ["A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z"];
+	var ret = alphabet[number];
+	if (number >= alphabet.length) { ret = "?"; }
+	return ret;}
+
+function setSociotype(person,sociotype){
+	s.persons[person].sociotype = s.sociotypes[sociotype];
+	generateRelations(); }
+
+
+function relsToHtml(rels) {
+	var ret = ""; for(var i=0;i<rels.length;i++){
+		ret += rels[i].link; }
+	return ret; }
+
+function generateRelations(){
+	var table = document.getElementById("relations");
+	var persons = [];
+	var row;
+	var cell;
+	var relation;
+	for (var i = 0; i < s.persons.length; i++) { if(s.persons[i].sociotype) { persons.push(s.persons[i]); }}
+	$( "#relations" ).empty();
+	for (var i = 0; i < persons.length; i++) {
+		row = table.insertRow(i);
+		for (var j = 0; j < persons.length; j++) {
+			relation = relsToHtml(getRelations(persons[i].sociotype, persons[j].sociotype));
+			cell = row.insertCell(j);
+			cell.innerHTML = persons[i].name + " " + relation + " " + persons[j].name; }}}
+
+function setSociotypes(person){
+	var bar = document.getElementById("typeBar");
+	bar.innerHTML = "";
+	var input;
+	for (var i = 0; i < s.sociotypes.length; i++){
+		input = document.createElement("BUTTON");
+		var t = document.createTextNode(generateSociotypeName(s.sociotypes[i]));
+		input.appendChild(t);
+		input.setAttribute("onclick", "setSociotype(" + person + "," + i + ");");
+		bar.appendChild(input);}}
+
+function changeName(person,name){
+	//console.log(name);
+	if(typeof name == "undefined") {
+		var name = document.getElementById("personInput" + person);
+		name = name.value;
+		s.persons[person].name = name;
+		generateRelations();}
+	else {
+		person.name = name;
+		generateRelations();
+	}}
+
+function Person(name,sociotype){
+	if(typeof name == "undefined") { this.name = numberToLetter(s.persons.length); }
+	else { this.name = name; }
+	this.quizSociotypes = [];
+	this.voteSociotypes = [];
+	if(typeof sociotype == "undefined") { this.sociotype = false; }
+	else{this.sociotype = blockSociotype(sociotype);}}
+
+function delPerson(person){
+	var uiElement;
+	uiElement = document.getElementById("personInput" + person);
+	uiElement.parentNode.removeChild(uiElement);
+	uiElement = document.getElementById("personButton" + person);
+	uiElement.parentNode.removeChild(uiElement);
+	s.persons[person].sociotype = false;
+	generateRelations();}
+
+function displayPersons(){
+	var bar = document.getElementById("personBar");
+	bar.innerHTML = "";
+	var input; var option;
+	for (var i = 0; i<s.persons.length; i++){
+		input = document.createElement("INPUT");
+		input.setAttribute("type","text");
+		input.setAttribute("size","20");
+		input.setAttribute("onmousedown", "setSociotypes('" + i + "');");
+		input.setAttribute("id", "personInput" + i);
+		input.value = s.persons[i].name;
+		input.setAttribute("onkeyup", "changeName('" + i + "');");
+		bar.appendChild(input);
+		input = document.createElement("SELECT");
+		for (var j=0; j < s.sociotypes.length; j++) {
+			option = document.createElement("option");
+			option.setAttribute("id", "person" + i + "sociotype" + j);
+			option.text = generateSociotypeName(s.sociotypes[i]);
+			input.add(option); }
+		var t = document.createTextNode("X");
+		input.appendChild(t);
+		input.setAttribute("onclick", "delPerson('" + i + "');");
+		input.setAttribute("id", "personButton" + i);
+		bar.appendChild(input);	}}
+
+function addPerson(name,sociotype){
+	var person = new Person(name,sociotype);
+	s.persons.push(person);
+	if(s.currentTab.handle == "rels") { displayPersons(); }}
+
+function displayTypeBar(){
+	var bar = document.getElementById("typeBar");
+	bar.innerHTML = "Begin by clicking on a text field to set the name and sociotype of persons A, B and C."; }
+
+function addPersonPerSociotype(){
+var name;
+	for(var i=0;i<s.sociotypes.length;i++){
+		name = generateSociotypeName(s.sociotypes[i]);
+		addPerson(name, s.sociotypes[i]);}
+		//s.persons[s.persons.length-1].name = /*generateSociotypeName(s.types[i]);*/ "kekkonen";}
+	if(s.tabs.handle == "rels") {
+		generateRelations();}}
+
+function displayPersonBar(){
+	var bar = document.getElementById("personUI");
+	bar.innerHTML = "";
+	if(!s.developerMode){ bar.innerHTML +=
+		"As you can see, socionics and MBTI have an <em>opposite</em> idea of what your ideal partner is like.<br />According to MBTI your ideal partner, your dual, is the worst for you and your conflictor is the best for you!"; }
+	else { bar.innerHTML +=
+		"<br /><button onclick=addPersonPerSociotype()>Generate all</button>\
+		<button onclick=addPerson()>Add person</button>"; }
+	if(s.persons.length == 0) {addPerson(); addPerson(); addPerson();}
+	displayPersons();
+	if(s.currentTab.handle == "rels"){generateRelations();}}
+
+function stringToHtml(str){
+	var ret = "";
+	for(var i=0;i<str.length;i++){
+		if(str.charAt(i) == "<"){ ret += "&lt;"; }
+		else{ret += str.charAt(i);}}
+	return ret;}
+
+function displayRels(){
+	displayPersonBar();
+	displayTypeBar();}
+
+//
+// RELS END, CELL BEGIN
+//
+
+function displayCell(alreadyInit){
+
+}
+
+//
+// CELL END, GRAPH BEGIN
+//
+
+function displayGraph(alreadyInit){
+	initGraph();
+	var ctx = $('canvas').get(0).getContext('2d');
+	var r = s.defaultRadius;
+	for(var i=0;i<s.persons.length+1;i++){
+		// Create gradient
+		ctx.beginPath();
+		var grd = ctx.createRadialGradient(r+i*r, r, 0, r+i*r, r, r);
+		if(i==s.persons.length) { grd.addColorStop(0,"rgba(0,0,0,0)"); }
+		else {grd.addColorStop(0,"rgba(255,0,0,1)");}		
+		grd.addColorStop(1,"rgba(255,0,0,0)");
+		// Fill with gradient
+		ctx.fillStyle = grd;
+		ctx.arc(r+i*r, r, r, 0, Math.PI*2, false);
+		ctx.fill();	}
+	ctx.fillRect(0, 0, 500, 500);
+	}
+
+function initGraph(){
+	var container = document.getElementById('graphContainer');
+	var width = container.offsetWidth;
+	var height = container.offsetHeight;
+	container.innerHTML = "<canvas id='canvas' width='" + width + "' height='" + height + "'></canvas>";
+	for(var i=0;i<s.persons.length;i++){
+		if (typeof s.persons[i].radius !== "undefined") {
+			s.persons[i].radius = s.defaultRadius;
+		}
+	}
+}
+
+//
+// GRAPH END, TABS BEGIN
+//
+
+function getTabByHandle(handle){for(var i =0; i<s.tabs.length; i++){ if(s.tabs[i].handle == handle) {return s.tabs[i];}}}
+
+/*
+function changeSociotypeNames(handle){
+	if (s.sociotypeNames == "socionics") { s.sociotypeNames = "mbti";}
+	else if (s.sociotypeNames == "mbti") { s.sociotypeNames = "socionics";}
+	initContent(s.currentTab);}
+	*/
+
+/*
+function displayTypeNameChanger(){ // TO DO: REM
+	var checked = "";
+	if(s.sociotypeNames == "socionics") {checked = "checked"}
+	var ret =
+		"<input id='typeNames'\
+		type='checkbox' "
+		+ checked + 
+		" onmousedown='changeSociotypeNames(\""
+		+ s.sociotypeNames + 
+		"\");'>Use Socionics type names</input>";
+	return ret;}
+	*/
+
+function alreadyInitTab(tabHandle){
+	if (_.contains(s.initTabs,tabHandle)) {return true;}
+	else {s.initTabs.push(tabHandle); return false;}}
+
+function initContent(tabHandle){
+	var alreadyInit = alreadyInitTab(tabHandle);
+	s.currentTab = tabHandle;
+	var content = document.getElementById("content"); var tab;
+	tab = getTabByHandle(tabHandle);
+	if(s.introComplete) {
+		for(var i = 0; i < s.tabs.length; i++){
+			if(s.tabs[i].handle == tabHandle) {
+				s.tabs[i].active = true;
+				document.getElementById(s.tabs[i].handle).style.borderBottom = "1px solid white"; }
+			else {
+				s.tabs[i].active = false;
+				document.getElementById(s.tabs[i].handle).style.borderBottom = "1px solid black"; }}}
+	if(!s.introComplete) { content.innerHTML = tab.introCode; }
+	else if(!s.developerMode && tab.clientCode) { content.innerHTML = tab.clientCode; }
+	else {content.innerHTML = tab.code; }
+	if(tabHandle == "quiz") { displayQuiz(alreadyInit); }
+	if(tabHandle == "type") { displayType(alreadyInit); }
+	if(tabHandle == "rels") { displayRels(alreadyInit); }
+	if(tabHandle == "cell") { displayCell(alreadyInit); }
+	if(tabHandle == "graph") { displayRels(alreadyInit); displayGraph(alreadyInit); }}
+
+function getTheoryByHandle(handle){for(var i =0; i<s.theories.length; i++){ if(s.theories[i].handle == handle) {return s.theories[i];}}}
+function initSettings(){
+	s.introComplete = true;
+	var ret = "";
+	ret += "<div class='settings'>Theory: <select>";
+	for(i=0; i<s.theories.length; i++){ ret += s.theories[i].code; } // XXX
+	var theory = getTheoryByHandle(s.currentTheory);
+	ret += "</select> Language: <select>";
+	for(i=0; i<theory.languages.length; i++) { ret += theory.languages[i].code; }
+	ret += "</select><div style='float:right'><input id='developerMode' type='checkbox' onmousedown='developerMode();'></input></div></div>";
+	return ret;}
+
+function initHeader(){
+	if(s.introComplete){
+		document.getElementById("header").style.display = 'block';
+		var buffer = ""; var input;
+		buffer += initSettings();
+		for(i=0; i<s.tabs.length; i++){
+			buffer +=
+				"<div class='tab' id='" + s.tabs[i].handle + "'\
+				onmousedown='initContent(\"" + s.tabs[i].handle + "\")'>" +
+				s.tabs[i].name + "</div>";	}
+		document.getElementById("header").innerHTML = buffer;
+		if(s.developerMode) { document.getElementById("developerMode").setAttribute("checked","true");}}
+	else { document.getElementById("header").style.display = 'none'; }}
+
+function Tab(handle,active,name,code,clientCode,introCode){
+	this.handle = handle;
+	this.active = active;
+	this.name = name;
+	this.code = code;
+	this.clientCode = clientCode;
+	this.introCode = introCode; }
+
+function introNext() { initContent("quiz"); }
+function quizNext() { initContent("rels"); }
+function relsNext() { initContent("cell"); }
+function cellNext() { s.introComplete = true; initHeader(); initContent("intro"); }
+function initTabs() {
+	var tabs = []; var buffer = {};
+	for(i=0; i < s.tabs.length; i++){
+		var theory;
+		buffer.active = false;
+		buffer.clientCode = false;
+		buffer.introCode = false;
+		buffer.handle = s.tabs[i];
+
+		if(s.tabs[i] == "intro") {
+			buffer.name = "Instructions";
+			buffer.clientCode =
+				"<p>You can configure Weatherman to make your own presentation. You can send the presentation to someone as an URL or study it yourself. Hover over THIS to study the controls.</p><ul>\
+				<li>THIS is the theory selector.</li>\
+				<li>THIS is the language selector. Many languages are available for Socionics.</li>\
+				<li>THIS is the reference selector. Many references are available for Socionics.</li></ul>\
+				<p>You need those for comparing theories in the Cellular Automaton tab. Click 'Next' to go back there.</p>\
+				<button id='instructionsNext' onmousedown='instructionsNext();'>Next</button><br />\
+				<button id='instructionsMore' onmousedown='instructionsMore();'>More instructions...</button>";
+			buffer.introCode =
+				"<p><em>Weatherman is going to tell you what's going on.</em></p>\
+				<p>You've probably heard of a personality theory called MBTI. It produces four-letter codes that are supposed to be your personality type. The codes look like this: ESTP, INFJ, ENTJ and so on.</p>\
+				<p>If you see a code so that the last letter is lower case, such as INTp, then it's not an MBTI code. That's a socionics code. A code with a lower case fourth letter stands for a sociotype.</p>\
+				<p>You can use this app to compare MBTI with Socionics to find out which one you like better.</p>\
+				<p>When you click next you will be asked four questions about yourself.</p>\
+				<button id='introNext' onmousedown='introNext();'>Next</button>";}
+
+		else if(s.tabs[i] == "quiz") {
+			buffer.name = "Quiz";
+			buffer.code =
+				"<table id='questions'></table>\
+				<button id='calculateType' onmousedown='generateResult();'>Get your type!</button>\
+				<div id='result'></div>";
+			buffer.clientCode = buffer.code;
+			buffer.introCode =
+				"<p>Look, this isn't the easiest part. These questionnaires aren't that reliable in the first place. Spending a lot of time to answer many questions doesn't make the result that much more reliable. So just answer these and remember:</p>\
+				<p>If you're unsure whether you're nice or cold, you're more likely to perceive. If you're unsure whether you're firm or impressionable, you're more likely to judge.</p>" + buffer.code;
+			buffer.moralystCode =
+				"<p>Think of some particular event. Some single thing that happened and that you can remember. Then describe that event by answering these questions.</p>" + buffer.code; }
+
+		else if(s.tabs[i] == "type") {
+			buffer.name = "Type";
+			buffer.code =
+				"<p>Sociotype Imaging Tool</p>\
+				<div id='typeContainer'></div><table id='sociotype'></table>\
+				<div id='legend'></div>\
+				<div id='typeDescription'></div>";
+			buffer.clientCode = buffer.code;
+			buffer.introCode = buffer.code;
+			buffer.moralystCode = buffer.code; }
+
+		else if(s.tabs[i] == "rels") {
+			buffer.name = "Table";
+			buffer.code =
+				"<div id='personUI'></div>\
+				<div id='personBar'></div>\
+				<div id='typeBar'></div>\
+				<table id='relations'></table>";
+			buffer.clientCode = buffer.code;
+			buffer.introCode =
+				"<p>MBTI and Socionics have an opposite idea of what your ideal partner is like.</p>\
+				<p>According to Socionics, the partner MBTI declares best for you is actually the worst for you!</p>\
+				<p>Your worst match is your <em>conflictor</em> and your best match is your <em>dual</em>.</p>"
+				+ buffer.code +
+				"<p>These theories can't both be right. The reason they produce different results is that their form is different. Click 'Next' to see some wacky graphical presentations of these forms</p>\
+				<button id='relsNext' onmousedown='relsNext();'>Next</button>"; }
+				// and to unlock all features of this app.
+
+		else if(s.tabs[i] == "cell") {
+			buffer.name = "Cellular automaton";
+			buffer.code =
+				"<div id='cellUI'></div>\
+				<table id='cell'></table>";
+			buffer.clientCode = buffer.code;
+			buffer.introCode =
+				"<h2>This is MBTI:</h2>\
+				<table id='MBTICell'></table>\
+				<h2>This is Socionics:</h2>\
+				<table id='SocionicsCell'></table>\
+				<p>I didn't invent those theories. But the next one I did.</p>\
+				<h2>Moralysis</h2>\
+				<table id='MoralysisCell'></table>\
+				<p>You're done with the intro. Click 'Next' to unlock all features of this app.</p>\
+				<button id='cellNext' onmousedown='cellNext();'>Next</button>"; }
+
+		else if(s.tabs[i] == "graph") {
+			buffer.name = "Graph";
+			buffer.code =
+				"<div id='personUI'></div>\
+				<div id='personBar'></div>\
+				<div id='typeBar'></div>\
+				<div id='graphContainer'></div>";}
+		else if(s.tabs[i] == "match") {
+			buffer.name = "Find Matches";
+			buffer.code = 
+				"match";}
+		s.tabs[i] = new Tab(buffer.handle, buffer.active, buffer.name, buffer.code, buffer.clientCode, buffer.introCode);}}
+
+//
+// TABS END, THEORIES BEGIN
+//
+
+// MODEL A BEGIN
+
+function assignBlocks(m) { /*console.log(m); console.log("ASSIGNBLOCKS END");*/ m.ego = new Block(m, "ego");	m.sEgo = new Block(m, "sego"); m.sId = new Block(m, "sid"); m.Id = new Block(m, "id"); }
+function Block(m,handle) {
+	/*if(m.jp < 0) {
+		if((m.ft < 0) && (m.sn < 0) && (m.ie < 0)) { switch(handle) {
+			case "ego":  this.acc = m.Fi; this.pro = m.Se; this.acc.handle = "Fi"; this.pro.handle = "Se"; break;
+			case "sego": this.acc = m.Ti; this.pro = m.Ne; this.acc.handle = "Ti"; this.pro.handle = "Ne"; break;
+			case "sid":  this.acc = m.Te; this.pro = m.Ni; this.acc.handle = "Te"; this.pro.handle = "Ni"; break;
+			case "id":   this.acc = m.Fe; this.pro = m.Si; this.acc.handle = "Fe"; this.pro.handle = "Si"; break; }}
+		else if((m.ft < 0) && (m.sn < 0) && (m.ie > 0)) { switch(handle) {
+			case "ego":  this.acc = m.Fe; this.pro = m.Si; this.acc.handle = "Fe"; this.pro.handle = "Si"; break;
+			case "sego": this.acc = m.Te; this.pro = m.Ni; this.acc.handle = "Te"; this.pro.handle = "Ni"; break;
+			case "sid":  this.acc = m.Ti; this.pro = m.Ne; this.acc.handle = "Ti"; this.pro.handle = "Ne"; break;
+			case "id":   this.acc = m.Fi; this.pro = m.Se; this.acc.handle = "Fi"; this.pro.handle = "Se"; break; }}
+		else if((m.ft < 0) && (m.sn > 0) && (m.ie < 0)) { switch(handle) {
+			case "ego":  this.acc = m.Fi; this.pro = m.Ne; this.acc.handle = "Fi"; this.pro.handle = "Ne"; break;
+			case "sego": this.acc = m.Ti; this.pro = m.Se; this.acc.handle = "Ti"; this.pro.handle = "Se"; break;
+			case "sid":  this.acc = m.Te; this.pro = m.Si; this.acc.handle = "Te"; this.pro.handle = "Si"; break;
+			case "id":   this.acc = m.Fe; this.pro = m.Ni; this.acc.handle = "Fe"; this.pro.handle = "Ni"; break; }}
+		else if((m.ft < 0) && (m.sn > 0) && (m.ie > 0)) { switch(handle) {
+			case "ego":  this.acc = m.Fe; this.pro = m.Ni; this.acc.handle = "Fe"; this.pro.handle = "Ni"; break;
+			case "sego": this.acc = m.Te; this.pro = m.Si; this.acc.handle = "Te"; this.pro.handle = "Si"; break;
+			case "sid":  this.acc = m.Ti; this.pro = m.Se; this.acc.handle = "Ti"; this.pro.handle = "Se"; break;
+			case "id":   this.acc = m.Fi; this.pro = m.Ne; this.acc.handle = "Fi"; this.pro.handle = "Ne"; break; }}
+		else if((m.ft > 0) && (m.sn < 0) && (m.ie < 0)) { switch(handle) {
+			case "ego":  this.acc = m.Ti; this.pro = m.Se; this.acc.handle = "Ti"; this.pro.handle = "Se"; break;
+			case "sego": this.acc = m.Fi; this.pro = m.Ne; this.acc.handle = "Fi"; this.pro.handle = "Ne"; break;
+			case "sid":  this.acc = m.Fe; this.pro = m.Ni; this.acc.handle = "Fe"; this.pro.handle = "Ni"; break;
+			case "id":   this.acc = m.Te; this.pro = m.Si; this.acc.handle = "Te"; this.pro.handle = "Si"; break; }}
+		else if((m.ft > 0) && (m.sn < 0) && (m.ie > 0)) { switch(handle) {
+			case "ego":  this.acc = m.Te; this.pro = m.Si; this.acc.handle = "Te"; this.pro.handle = "Si"; break;
+			case "sego": this.acc = m.Fe; this.pro = m.Ni; this.acc.handle = "Fe"; this.pro.handle = "Ni"; break;
+			case "sid":  this.acc = m.Fi; this.pro = m.Ne; this.acc.handle = "Fi"; this.pro.handle = "Ne"; break;
+			case "id":   this.acc = m.Ti; this.pro = m.Se; this.acc.handle = "Ti"; this.pro.handle = "Se"; break; }}
+		else if((m.ft > 0) && (m.sn > 0) && (m.ie < 0)) { switch(handle) {
+			case "ego":  this.acc = m.Ti; this.pro = m.Ne; this.acc.handle = "Ti"; this.pro.handle = "Ne"; break;
+			case "sego": this.acc = m.Fi; this.pro = m.Se; this.acc.handle = "Fi"; this.pro.handle = "Se"; break;
+			case "sid":  this.acc = m.Fe; this.pro = m.Si; this.acc.handle = "Fe"; this.pro.handle = "Si"; break;
+			case "id":   this.acc = m.Te; this.pro = m.Ni; this.acc.handle = "Te"; this.pro.handle = "Ni"; break; }}
+		else if((m.ft > 0) && (m.sn > 0) && (m.ie > 0)) { switch(handle) {
+			case "ego":  this.acc = m.Te; this.pro = m.Ni; this.acc.handle = "Te"; this.pro.handle = "Ni"; break;
+			case "sego": this.acc = m.Fe; this.pro = m.Si; this.acc.handle = "Fe"; this.pro.handle = "Si"; break;
+			case "sid":  this.acc = m.Fi; this.pro = m.Se; this.acc.handle = "Fi"; this.pro.handle = "Se"; break;
+			case "id":   this.acc = m.Ti; this.pro = m.Ne; this.acc.handle = "Ti"; this.pro.handle = "Ne"; break; }}}*/
+	/*else*/ if(m.jp > 0) {/*
+		if((m.sn < 0) && (m.ft < 0) && (m.ie < 0)) { switch(handle) {
+			case "ego":  this.acc = m.Si; this.pro = m.Fe; this.acc.handle = "Si"; this.pro.handle = "Fe"; break;
+			case "sego": this.acc = m.Ni; this.pro = m.Te; this.acc.handle = "Ni"; this.pro.handle = "Te"; break;
+			case "sid":  this.acc = m.Ne; this.pro = m.Ti; this.acc.handle = "Ne"; this.pro.handle = "Ti"; break;
+			case "id":   this.acc = m.Se; this.pro = m.Fi; this.acc.handle = "Se"; this.pro.handle = "Fi"; break; }}
+		else if((m.sn < 0) && (m.ft < 0) && (m.ie > 0)) { switch(handle) {
+			case "ego":  this.acc = m.Se; this.pro = m.Fi; this.acc.handle = "Se"; this.pro.handle = "Fi"; break;
+			case "sego": this.acc = m.Ne; this.pro = m.Ti; this.acc.handle = "Ne"; this.pro.handle = "Ti"; break;
+			case "sid":  this.acc = m.Ni; this.pro = m.Te; this.acc.handle = "Ni"; this.pro.handle = "Te"; break;
+			case "id":   this.acc = m.Si; this.pro = m.Fe; this.acc.handle = "Si"; this.pro.handle = "Fe"; break; }}
+		else if((m.sn < 0) && (m.ft > 0) && (m.ie < 0)) { switch(handle) {
+			case "ego":  this.acc = m.Si; this.pro = m.Te; this.acc.handle = "Si"; this.pro.handle = "Te"; break;
+			case "sego": this.acc = m.Ni; this.pro = m.Fe; this.acc.handle = "Ni"; this.pro.handle = "Fe"; break;
+			case "sid":  this.acc = m.Ne; this.pro = m.Fi; this.acc.handle = "Ne"; this.pro.handle = "Fi"; break;
+			case "id":   this.acc = m.Se; this.pro = m.Ti; this.acc.handle = "Se"; this.pro.handle = "Ti"; break; }}
+		else if((m.sn < 0) && (m.ft > 0) && (m.ie > 0)) { switch(handle) {
+			case "ego":  this.acc = m.Se; this.pro = m.Ti; this.acc.handle = "Se"; this.pro.handle = "Ti"; break;
+			case "sego": this.acc = m.Ne; this.pro = m.Fi; this.acc.handle = "Ne"; this.pro.handle = "Fi"; break;
+			case "sid":  this.acc = m.Ni; this.pro = m.Fe; this.acc.handle = "Ni"; this.pro.handle = "Fe"; break;
+			case "id":   this.acc = m.Si; this.pro = m.Te; this.acc.handle = "Si"; this.pro.handle = "Te"; break; }}
+		else if((m.sn > 0) && (m.ft < 0) && (m.ie < 0)) { switch(handle) {
+			case "ego":  this.acc = m.Ni; this.pro = m.Fe; this.acc.handle = "Ni"; this.pro.handle = "Fe"; break;
+			case "sego": this.acc = m.Si; this.pro = m.Te; this.acc.handle = "Si"; this.pro.handle = "Te"; break;
+			case "sid":  this.acc = m.Se; this.pro = m.Ti; this.acc.handle = "Se"; this.pro.handle = "Ti"; break;
+			case "id":   this.acc = m.Ne; this.pro = m.Fi; this.acc.handle = "Ne"; this.pro.handle = "Fi"; break; }}
+		else if((m.sn > 0) && (m.ft < 0) && (m.ie > 0)) { switch(handle) {
+			case "ego":  this.acc = m.Ne; this.pro = m.Fi; this.acc.handle = "Ne"; this.pro.handle = "Fi"; break;
+			case "sego": this.acc = m.Se; this.pro = m.Ti; this.acc.handle = "Se"; this.pro.handle = "Ti"; break;
+			case "sid":  this.acc = m.Si; this.pro = m.Te; this.acc.handle = "Si"; this.pro.handle = "Te"; break;
+			case "id":   this.acc = m.Ni; this.pro = m.Fe; this.acc.handle = "Ni"; this.pro.handle = "Fe"; break; }}
+		else*/ if((m.sn > 0) && (m.ft > 0) && (m.ie < 0)) { switch(handle) {
+			case "ego":  this.acc = m.Ni; this.pro = m.Te; this.acc.handle = "Ni"; this.pro.handle = "Te"; break;
+			case "sego": this.acc = m.Si; this.pro = m.Fe; this.acc.handle = "Si"; this.pro.handle = "Fe"; break;
+			case "sid":  this.acc = m.Se; this.pro = m.Fi; this.acc.handle = "Se"; this.pro.handle = "Fi"; break;
+			case "id":   this.acc = m.Ne; this.pro = m.Ti; this.acc.handle = "Ne"; this.pro.handle = "Ti"; break; }}
+		/*else if((m.sn > 0) && (m.ft > 0) && (m.ie > 0)) { switch(handle) {
+			case "ego":  this.acc = m.Ne; this.pro = m.Ti; this.acc.handle = "Ne"; this.pro.handle = "Ti"; break;
+			case "sego": this.acc = m.Se; this.pro = m.Fi; this.acc.handle = "Se"; this.pro.handle = "Fi"; break;
+			case "sid":  this.acc = m.Si; this.pro = m.Fe; this.acc.handle = "Si"; this.pro.handle = "Fe"; break;
+			case "id":   this.acc = m.Ni; this.pro = m.Te; this.acc.handle = "Ni"; this.pro.handle = "Te"; break; }}*/}}
+
+function evaluateProducingFunctions(m) {
+	if (m.jp < 0) {
+		if 		((m.ie < 0) && (m.sn < 0))	{ m.Se.val = 1;  m.Ne.val = -1; m.Se.pro = 1; m.Ne.pro = 1; }
+		else if ((m.ie < 0) && (m.sn > 0))	{ m.Se.val = -1; m.Ne.val = 1;  m.Se.pro = 1; m.Ne.pro = 1; }
+		else if ((m.ie > 0) && (m.sn < 0))	{ m.Si.val = 1;  m.Ni.val = -1; m.Si.pro = 1; m.Ni.pro = 1; }
+		else if ((m.ie > 0) && (m.sn > 0))	{ m.Si.val = -1; m.Ni.val = 1;  m.Si.pro = 1; m.Ni.pro = 1; }}
+	else if (m.jp > 0) {
+		if 		((m.ie < 0) && (m.ft < 0))	{ m.Fe.val = 1;  m.Ti.val = -1; m.Fe.pro = 1; m.Ti.pro = 1; }
+		else if ((m.ie < 0) && (m.ft > 0))	{ m.Fe.val = -1; m.Ti.val = 1;  m.Fe.pro = 1; m.Ti.pro = 1; }
+		else if ((m.ie > 0) && (m.ft > 0))  { m.Fi.val = 1;  m.Te.val = -1; m.Fi.pro = 1; m.Te.pro = 1; }
+		else if ((m.ie > 0) && (m.ft > 0))  { m.Fi.val = -1; m.Te.val = 1;  m.Fi.pro = 1; m.Te.pro = 1; }}}
+
+function evaluateAcceptingFunctions(m) {
+	if (m.jp < 0) {
+		if(m.ie < 0) 		{ m.Fi.val = 1;  m.Ti.val = 1;  m.Fe.val = -1; m.Te.val = -1;
+							  m.Fi.acc = 1;  m.Ti.acc = 1;  m.Fe.acc = 1;  m.Te.acc = 1; }
+		else if(m.ie > 0)	{ m.Fi.val = -1; m.Ti.val = -1; m.Fe.val = 1;  m.Te.val = 1;
+							  m.Fi.acc = 1;  m.Ti.acc = 1;  m.Fe.acc = 1;  m.Te.acc = 1; }}
+	else if (m.jp > 0) {
+		if(m.ie < 0)		{ m.Si.val = 1;  m.Ni.val = 1;  m.Se.val = -1; m.Ne.val = -1;
+							  m.Si.acc = 1;  m.Ni.acc = 1;  m.Se.acc = 1;  m.Ne.acc = 1; }
+		else if(m.ie > 0) 	{ m.Si.val = -1; m.Ni.val = -1; m.Se.val = 1;  m.Ne.val = 1;
+							  m.Si.acc = 1;  m.Ni.acc = 1;  m.Se.acc = 1;  m.Se.acc = 1; }}}
+
+function OctantMatrix(p){ // no oishan se nyt mielenkiintosempaa jos olis vitun pieni pää ja silti olis älykäs
+	var ego = {}; this.ego = ego;
+	var sEgo = {}; this.sEgo = sEgo;
+	var sId = {}; this.sId = sId;
+	var id = {}; this.id = id;
+	var S = {}; this.S = S;
+	var N = {}; this.N = N;
+	var T = {}; this.T = T;
+	var F = {}; this.F = F;
+	this.ie = p.ie;
+	this.sn = p.sn;
+	this.ft = p.ft;
+	this.jp = p.jp;
+	if 		(p.sn < 0)	{ this.N.str = -1; this.S.str = 1; }
+	else if (p.sn > 0) 	{ this.S.str = -1; this.N.str = 1; }
+	if 		(p.ft < 0)	{ this.T.str = -1; this.F.str = 1; }
+	else if (p.ft > 0)	{ this.F.str = -1; this.T.str = 1; }
+	if 		((p.ie < 0) && (p.jp < 0)) { this.F.ie = -1; this.T.ie = -1; }
+	else if ((p.ie < 0) && (p.jp > 0)) { this.S.ie = -1; this.N.ie = -1; }
+	else if ((p.ie > 0) && (p.jp < 0)) { this.F.ie = 1;  this.T.ie = 1; }
+	else if ((p.ie > 0) && (p.jp > 0)) { this.S.ie = 1;  this.N.ie = 1; }}
+
+function blockSociotype(type) {
+	var ret;
+	ret = new OctantMatrix(type);
+	evaluateAcceptingFunctions(ret);
+	evaluateProducingFunctions(ret);
+	assignBlocks(ret);
+	return ret;}
+
+// MODEL A END
+
+function addRelative(source,handle) {
+	var ret = [];
+
+}
+
+function Relation(handle){
+	this.handle = handle;
+	if(s.currentDescriptions == "socionics.com") {
+		if(handle == "IDN"){ this.desc = "http://www.socionics.com/rel/idn.htm"; }
+		else if(handle == "QID") { this.desc = "http://www.socionics.com/rel/qid.htm"; }
+		else if(handle == "CMP") { this.desc = "http://www.socionics.com/rel/cmp.htm"; }
+		else if(handle == "LKL") { this.desc = "http://www.socionics.com/rel/lkl.htm"; }
+		else if((handle == "BN>") || (handle == "<BN")) { this.desc = "http://www.socionics.com/rel/bn.htm"; }
+		else if(handle == "EGO") { this.desc = "http://www.socionics.com/rel/ego.htm"; }
+		else if(handle == "ACT") { this.desc = "http://www.socionics.com/rel/act.htm"; }
+		else if(handle == "CNT") { this.desc = "http://www.socionics.com/rel/cnt.htm"; }
+		else if(handle == "MRR") { this.desc = "http://www.socionics.com/rel/mrr.htm"; }
+		else if(handle == "ILL") { this.desc = "http://www.socionics.com/rel/ill.htm"; }
+		else if(handle == "SDL") { this.desc = "http://www.socionics.com/rel/qid.htm"; }
+		else if((handle == "<SP") || (handle == "SP>")) { this.desc = "http://www.socionics.com/rel/sp.htm"; }
+		else if(handle == "DLT") { this.desc = "http://www.socionics.com/rel/dlt.htm"; }
+		else if(handle == "CNF") { this.desc = "http://www.socionics.com/rel/cnf.htm"; }}
+	this.link =  "<a target='_blank' href='" + this.desc + "'>" + stringToHtml(handle) + "</a>";
+	console.log(this.link);}
+
+function getRelations(type1,type2){
+	var ret = []; var buffer;
+	if(typeof type2 == "undefined"){
+		var ie = type1.ie; var sn = type1.sn; var ft = type1.ft; var jp = type1.jp; }
+	else {
+		if (type1.ie == type2.ie) {	var ie = 1; } else { var ie = -1; }
+		if (type1.sn == type2.sn) {	var sn = 1; } else { var sn = -1; }
+		if (type1.ft == type2.ft) {	var ft = 1; } else { var ft = -1; }
+		if (type1.jp == type2.jp) {	var jp = 1; } else { var jp = -1; }}
+	if ((ie > -1) && (sn > -1) && (ft > -1) && (jp > -1)) {
+		buffer = new Relation("IDN"); ret.push(buffer); }
+	if ((ie > -1) && (sn > -1) && (ft > -1) && (jp < 0)) {
+		buffer = new Relation("QID"); ret.push(buffer); }
+	if ((ie > -1) && (sn > -1) && (ft < 0) && (jp > -1)) {
+		if((typeof type2 == "undefined") || (type1.jp > -1)) { buffer = new Relation("CMP"); ret.push(buffer); }
+		else { buffer = new Relation("LKL"); ret.push(buffer); }}
+	if ((ie > -1) && (sn > -1) && (ft < 0) && (jp < 0)) {
+		if((typeof type2 == "undefined") || (type1.jp > -1)) { buffer = new Relation("BN>"); ret.push(buffer); }
+		else { buffer = new Relation("<BN"); ret.push(buffer); }}
+	if ((ie > -1) && (sn < 0) && (ft > -1) && (jp > -1)) {
+		if((typeof type2 == "undefined") || (type1.jp > -1)) { buffer = new Relation("LKL"); ret.push(buffer); }
+		else { buffer = new Relation("CMP"); ret.push(buffer); }}
+	if ((ie > -1) && (sn < 0) && (ft > -1) && (jp < 0)) {
+		if((typeof type2 == "undefined") || (type1.jp > -1)) { buffer = new Relation("<BN"); ret.push(buffer); }
+		else { buffer = new Relation("BN>"); ret.push(buffer); }}
+	if ((ie > -1) && (sn < 0) && (ft < 0) && (jp > -1)) {
+		buffer = new Relation("EGO"); ret.push(buffer); }
+	if ((ie > -1) && (sn < 0) && (ft < 0) && (jp < 0)) {
+		buffer = new Relation("ACT"); ret.push(buffer); }
+	if ((ie < 0) && (sn > -1) && (ft > -1) && (jp > -1)) {
+		buffer = new Relation("CNT"); ret.push(buffer); }
+	if ((ie < 0) && (sn > -1) && (ft > -1) && (jp < 0)) {
+		buffer = new Relation("MRR"); ret.push(buffer); }
+	if ((ie < 0) && (sn > -1) && (ft < 0) && (jp > -1)) {
+		if((typeof type2 == "undefined") || (type1.jp > -1)) { buffer = new Relation("ILL"); ret.push(buffer); }
+		else { buffer = new Relation("SDL"); ret.push(buffer); }}
+	if ((ie < 0) && (sn > -1) && (ft < 0) && (jp < 0)) {
+		if((typeof type2 == "undefined") || (type1.jp > -1)) { buffer = new Relation("<SP"); ret.push(buffer); }
+		else { buffer = new Relation("SP>"); ret.push(buffer); }}
+	if ((ie < 0) && (sn < 0) && (ft > -1) && (jp > -1)) {
+		if((typeof type2 == "undefined") || (type1.jp > -1)) { buffer = new Relation("SDL"); ret.push(buffer); }
+		else { buffer = new Relation("ILL"); ret.push(buffer); }}
+	if ((ie < 0) && (sn < 0) && (ft > -1) && (jp < 0)) {
+		if((typeof type2 == "undefined") || (type1.jp > -1)) { buffer = new Relation("SP>"); ret.push(buffer); }
+		else { buffer = new Relation("<SP"); ret.push(buffer); }}
+	if ((ie < 0) && (sn < 0) && (ft < 0) && (jp > -1)) {
+		buffer = new Relation("DLT"); ret.push(buffer); }
+	if ((ie < 0) && (sn < 0) && (ft < 0) && (jp < 0)) {
+		buffer = new Relation("CNF"); ret.push(buffer); }
+	return ret;}
+
+function generateMBTiName(type){
+	var ret = ""; var ie = type.ie; var sn = type.sn; var ft = type.ft; var jp = type.jp;
+	if (ie > 0)	{ ret += "E"; }
+	else if (ie < 0) { ret += "I"; }
+	else {ret += "X";};
+	if (sn > 0) { ret += "N"; }
+	else if (sn < 0) { ret += "S"; }
+	else {ret += "X";};
+	if (ft > 0) { ret += "T"; }
+	else if (ft < 0) { ret += "F"; }
+	else {ret += "X";}
+	if (jp > 0) { ret += "p"; }
+	else if (jp < 0) { ret += "j"; }
+	else { ret += "x";}
+	return ret;}
+
+function generateSocionicsName(type){
+	var ret = generateMBTiName(type);
+	if (ret == "ISFj") {ret = "ESI"}
+	else if (ret == "ISFp") {ret = "SEI"}
+	else if (ret == "ISTj") {ret = "LSI"}
+	else if (ret == "ISTp") {ret = "SLI"}
+	else if (ret == "INFj") {ret = "EII"}
+	else if (ret == "INFp") {ret = "IEI"}
+	else if (ret == "INTj") {ret = "LII"}
+	else if (ret == "INTp") {ret = "ILI"}
+	else if (ret == "ESFj") {ret = "ESE"}
+	else if (ret == "ESFp") {ret = "SEE"}
+	else if (ret == "ESTj") {ret = "SLE"}
+	else if (ret == "ESTp") {ret = "LSE"}
+	else if (ret == "ENFj") {ret = "EIE"}
+	else if (ret == "ENFp") {ret = "IEE"}
+	else if (ret == "ENTj") {ret = "LIE"}
+	else if (ret == "ENTp") {ret = "ILE"}
+	return ret;}
+
+function Sociotype(ie,sn,ft,jp){ this.ie = ie; this.sn = sn; this.ft = ft; this.jp = jp;}
+function MBTIType(ie,sn,ft,jp){	this.ie = ie; this.sn = sn; this.ft = ft; this.jp = jp;}
+
+function getMBTITypeOfSociotype(input,output){
+	var ret;
+
+}
+
+function generateSociotypeName(sociotype){
+	var ret;
+	if (s.sociotypeNames == "MBTi") {ret = generateMBTiName(sociotype);}
+	else if (s.sociotypeNames == "socionics") {ret = generateSocionicsName(sociotype);}
+	return ret;}
+
+// a roguelike game in which the player psychologically needs his pet :DDDD XDD
+// empathy manifests as ability to see faces
+// telepathy manifests as ability to see souls
+
+// god should be a man because women pay more attention to people than things but they would envy a god who is a woman
+
+// strategy is this:
+// those who believe in MBTI are the target audience
+// use developer mode to create presentations specifically intended for some person or group, then send uri of presentation to target
+// what's in it for me: someone might experimentally click on moralysis and study my work
+// this is win-win because most clients would dismiss moralysis as something too complicated. i could use even a few clients but you need a larger audience to make an effect
+
+// Look, this isn't the easiest part. These questionnaires aren't that reliable in the first place. Spending a lot of time to answer many questions doesn't make the result that much more reliable. So just answer these and remember:
+
+//If you're unsure whether you're nice or cold, you're more likely to perceive. If you're unsure whether you're firm or impressionable, you're more likely to judge.
+
+function initSociotypes(){
+	var type;
+	type = new Sociotype(-1,-1,-1,-1); s.sociotypes.push(type);
+	type = new Sociotype(-1,-1,-1,1); s.sociotypes.push(type);
+	type = new Sociotype(-1,-1,1,-1); s.sociotypes.push(type);
+	type = new Sociotype(-1,-1,1,1); s.sociotypes.push(type);
+	type = new Sociotype(-1,1,-1,-1); s.sociotypes.push(type);
+	type = new Sociotype(-1,1,-1,1); s.sociotypes.push(type);
+	type = new Sociotype(-1,1,1,-1); s.sociotypes.push(type);
+	type = new Sociotype(-1,1,1,1); s.sociotypes.push(type);
+	type = new Sociotype(1,-1,-1,-1); s.sociotypes.push(type);
+	type = new Sociotype(1,-1,-1,1); s.sociotypes.push(type);
+	type = new Sociotype(1,-1,1,-1); s.sociotypes.push(type);
+	type = new Sociotype(1,-1,1,1); s.sociotypes.push(type);
+	type = new Sociotype(1,1,-1,-1); s.sociotypes.push(type);
+	type = new Sociotype(1,1,-1,1); s.sociotypes.push(type);
+	type = new Sociotype(1,1,1,-1); s.sociotypes.push(type);
+	type = new Sociotype(1,1,1,1); s.sociotypes.push(type);}
+
+function initMBTITypes(){
+	var type;
+	type = new MBTIType(-1,-1,-1,-1); s.MBTITypes.push(type);
+	type = new MBTIType(-1,-1,-1,1); s.MBTITypes.push(type);
+	type = new MBTIType(-1,-1,1,-1); s.MBTITypes.push(type);
+	type = new MBTIType(-1,-1,1,1); s.MBTITypes.push(type);
+	type = new MBTIType(-1,1,-1,-1); s.MBTITypes.push(type);
+	type = new MBTIType(-1,1,-1,1); s.MBTITypes.push(type);
+	type = new MBTIType(-1,1,1,-1); s.MBTITypes.push(type);
+	type = new MBTIType(-1,1,1,1); s.MBTITypes.push(type);
+	type = new MBTIType(1,-1,-1,-1); s.MBTITypes.push(type);
+	type = new MBTIType(1,-1,-1,1); s.MBTITypes.push(type);
+	type = new MBTIType(1,-1,1,-1); s.MBTITypes.push(type);
+	type = new MBTIType(1,-1,1,1); s.MBTITypes.push(type);
+	type = new MBTIType(1,1,-1,-1); s.MBTITypes.push(type);
+	type = new MBTIType(1,1,-1,1); s.MBTITypes.push(type);
+	type = new MBTIType(1,1,1,-1); s.MBTITypes.push(type);
+	type = new MBTIType(1,1,1,1); s.MBTITypes.push(type);}
+
+function Language(handle,active,name,code,sociotypes,MBTITypes){
+	this.handle = handle;
+	this.active = active;
+	this.name = name;
+	this.code = code;
+	this.sociotypes = sociotypes;
+	this.MBTITypes = MBTITypes; }
+
+function initConcepts(handle){ // TO DO: Not needed yet
+	var ret = []; return ret; }
+
+function initLanguage(handle){
+	var ret = {};
+	if(handle == "mbti") {	ret.name = "MBTi"; }
+	else if(handle == "socionics") { ret.name = "Socionics"; }
+	else if(handle == "moralysis") { ret.name = "Moralysis"; }
+	ret.code = "<option value='" + handle + "' oninput='selectLanguage(" + handle + ")'>" + ret.name + "</option>"; // xxx oninput   input.setAttribute("onclick", "delPerson('" + i + "');");
+	ret.concepts = initConcepts(handle);
+	ret = new Language(handle, false, ret.name, ret.code, ret.concepts);
+	s.languages.push(ret);
+	return ret; }
+
+function initTheory(handle){
+	for(var i=0;i<s.theories.length;i++){
+		if(s.theories[i].handle == handle) { s.theories[i].active = true; }
+		else { s.theories[i].active = false; }}}
+
+function describeTheory(handle){
+	var ret = "";
+	if (handle == "moralysis") { ret =
+		"Moralysis is a theory of the moral value of events. It is analytic like Jungian psychology. It is based on the Metaphysics of Quality by Robert Pirsig."; }
+	else if (handle == "socionics") {ret = 
+		"Socionics is a theory of the attributes of different personalities. These attributes are supposed to remain same throughout that person's adulthood. The personality types of socionics are called sociotypes and they determine what kind of things a person is psychologically hardwired to value."; }
+	else if (handle == "MBTI") { ret = 
+		"MBTI is a personality theory similar to socionics. It is different from socionics. MBTI and socionics maybe cannot both be true."; }
+	return ret; }
+
+function Theory(handle,active,name,code,languages){
+	this.handle = handle;
+	this.active = active;
+	this.name = name;
+	this.code = code;
+	this.languages = languages;
+	console.log(languages);
+	this.language = languages[0];
+	this.desc = describeTheory(handle);}
+
+function initTheories(){
+	for(i=0; i<s.theories.length; i++){
+		var buffer = {};
+		buffer.active = false;
+		buffer.handle = s.theories[i];
+		buffer.languages = [];
+		if(s.theories[i] == "MBTI"){
+			initMBTITypes();
+			buffer.languages.push(initLanguage("MBTI"));
+			buffer.languages.push(initLanguage("socionics"));
+			buffer.name = "MBTI"; }
+		else if(s.theories[i] == "socionics"){
+			initSociotypes();
+			initPsychQuestions();
+			buffer.languages.push(initLanguage("MBTi"));
+			buffer.languages.push(initLanguage("socionics"));
+			//buffer.languages.push(new Language("mbti", true, "pseudo-MBTI", "<option value='mbti'>"));
+			buffer.name = "Socionics"; }
+		else if(s.theories[i] == "moralysis"){
+			buffer.name = "Moralysis";
+			buffer.languages.push(initLanguage("moralysis")); }
+		buffer.code = "<option value='" + s.theories[i] + "'>" + buffer.name + "</option>";
+		s.theories[i] = new Theory(buffer.handle, buffer.active, buffer.name, buffer.code, buffer.languages);}
+	initTheory(s.currentTheory);}
+
+//
+// THEORIES END
+//
+
+function init() {
+	initTheories();
+	initTabs();
+	initHeader();
+	initContent(s.initTab);}
+	
+
+
+		</script>
+	</head>
+	<body onload="init();">
+
+		<div id="wrapper">
+			<div id="header"></div>
+			<div id="content"></div>
+		</div>
+		<footer class="footer"></footer>
+	</body>
+</html>
